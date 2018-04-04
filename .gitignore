@@ -1,0 +1,11 @@
+*.iml
+.gradle
+/RobotRemote/local.properties
+/RobotRemote/.idea/workspace.xml
+/RobotRemote/.idea/libraries
+/RobotRemote/.DS_Store
+/RobotRemote/build
+/RobotRemote/captures
+/RobotRemote/.externalNativeBuild
+
+/socketRobot/node_modules
