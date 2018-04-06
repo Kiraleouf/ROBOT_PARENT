@@ -35,15 +35,22 @@ class MainActivity : Activity() {
     val TAG = "MainActivity"
 
     private val MOTOR1_PWM = "PWM0" // Mauve -> BCM18
-    //    private val MOTOR2_PWM = "PWM1" // ? -> BCM13
-    private val MOTOR1_A = "BCM23"// Gris
-    private val MOTOR1_B = "BCM24" // Blanc
+    private val MOTOR1_A = "BCM23"// Grey
+    private val MOTOR1_B = "BCM24" // White
+
+    private val MOTOR2_PWM = "PWM1" // Orange -> BCM13
+    private val MOTOR2_A = "BCM19"// Yellow
+    private val MOTOR2_B = "BCM26" // Green
 
     private lateinit var peripheralManagerService: PeripheralManagerService
 
-    private lateinit var gpioMotorPwm: Pwm
-    private lateinit var gpioMotorA: Gpio
-    private lateinit var gpioMotorB: Gpio
+    private lateinit var motor1Pwm: Pwm
+    private lateinit var motor1A: Gpio
+    private lateinit var motor1B: Gpio
+
+    private lateinit var motor2Pwm: Pwm
+    private lateinit var motor2A: Gpio
+    private lateinit var motor2B: Gpio
 
     private val handler = Handler()
 
@@ -56,7 +63,6 @@ class MainActivity : Activity() {
     private val BOTTOM = 6
     private val BOTTOM_LEFT = 7
     private val IDLE = -1
-    private var currentDir = ""
 
     private var socket = IO.socket("http://192.168.0.26:4000")
 
@@ -67,8 +73,8 @@ class MainActivity : Activity() {
 
         // periph
         initPeriph()
-        initMotor()
-        testMotor()
+        initMotors()
+        testMotors()
 
         // socket
         connect()
@@ -77,12 +83,12 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         Log.w(TAG, "onDestroy")
-        gpioMotorPwm.setPwmFrequencyHz(0.0)
-        gpioMotorPwm.setPwmDutyCycle(0.0)
-        gpioMotorPwm.setEnabled(false)
-        gpioMotorPwm.close()
-        gpioMotorA.close()
-        gpioMotorB.close()
+        motor1Pwm.setPwmFrequencyHz(0.0)
+        motor1Pwm.setPwmDutyCycle(0.0)
+        motor1Pwm.setEnabled(false)
+        motor1Pwm.close()
+        motor1A.close()
+        motor1B.close()
     }
 
     private fun initPeriph() {
@@ -91,25 +97,38 @@ class MainActivity : Activity() {
         Log.d(TAG, "PWM pin available: " + peripheralManagerService.pwmList.forEach { pwm -> Log.d(TAG, pwm) })
     }
 
-    private fun initMotor() {
-        Log.d(TAG, "Init motor 1")
-        gpioMotorA = peripheralManagerService.openGpio(MOTOR1_A)
-        gpioMotorA.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW)
-        gpioMotorB = peripheralManagerService.openGpio(MOTOR1_B)
-        gpioMotorB.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW)
-        gpioMotorPwm = peripheralManagerService.openPwm(MOTOR1_PWM)
-        gpioMotorPwm.setPwmFrequencyHz(50.0)
-        gpioMotorPwm.setPwmDutyCycle(100.0)
+    private fun initMotors() {
+        Log.d(TAG, "Init motors")
+        motor1A = peripheralManagerService.openGpio(MOTOR1_A)
+        motor1A.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW)
+        motor1B = peripheralManagerService.openGpio(MOTOR1_B)
+        motor1B.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW)
+        motor1Pwm = peripheralManagerService.openPwm(MOTOR1_PWM)
+        motor1Pwm.setPwmFrequencyHz(50.0)
+        motor1Pwm.setPwmDutyCycle(100.0)
+
+        motor2A = peripheralManagerService.openGpio(MOTOR2_A)
+        motor2A.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW)
+        motor2B = peripheralManagerService.openGpio(MOTOR2_B)
+        motor2B.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW)
+        motor2Pwm = peripheralManagerService.openPwm(MOTOR2_PWM)
+        motor2Pwm.setPwmFrequencyHz(50.0)
+        motor2Pwm.setPwmDutyCycle(100.0)
     }
 
-    private fun testMotor() {
-        gpioMotorA.value = false
-        gpioMotorB.value = true
-        gpioMotorPwm.setEnabled(true)
+    private fun testMotors() {
+        motor1A.value = false
+        motor1B.value = true
+        motor1Pwm.setEnabled(true)
+
+        motor2A.value = false
+        motor2B.value = true
+        motor2Pwm.setEnabled(true)
 
         handler.postDelayed({
             Log.w(TAG, "post delay stop motor after 5sec")
-            gpioMotorPwm.setEnabled(false)
+            motor1Pwm.setEnabled(false)
+            motor2Pwm.setEnabled(false)
         }, 5000)
     }
 
@@ -124,9 +143,37 @@ class MainActivity : Activity() {
                 })
                 .on("message", fun(message) {
                     Log.i(TAG, "message: " + message[0])
-                })
-                .on("event", fun(message) {
-                    Log.i(TAG, "event: " + message[0])
+                    val direction = message[0]
+                    when (direction) {
+                        IDLE -> {
+                            motor1Pwm.setEnabled(false)
+                            motor2Pwm.setEnabled(false)
+                        }
+                        TOP, TOP_RIGHT, TOP_LEFT -> {
+                            motor1Pwm.setEnabled(false)
+                            motor1A.value = false
+                            motor1B.value = true
+                            motor1Pwm.setEnabled(true)
+                            motor2Pwm.setEnabled(false)
+                            motor2A.value = false
+                            motor2B.value = true
+                            motor2Pwm.setEnabled(true)
+                        }
+                        BOTTOM, BOTTOM_RIGHT, BOTTOM_LEFT -> {
+                            motor1Pwm.setEnabled(false)
+                            motor1A.value = true
+                            motor1B.value = false
+                            motor1Pwm.setEnabled(true)
+                            motor2Pwm.setEnabled(false)
+                            motor2A.value = true
+                            motor2B.value = false
+                            motor2Pwm.setEnabled(true)
+                        }
+                        else -> {
+                            motor1Pwm.setEnabled(true)
+                            motor2Pwm.setEnabled(true)
+                        }
+                    }
                 })
     }
 
